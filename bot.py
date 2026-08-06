@@ -559,4 +559,9 @@ def default(msg):
 if __name__ == "__main__":
     print("🚀 ربات در حال اجراست...")
     init_db()
+    
+    # حذف Webhook برای جلوگیری از تداخل با Polling
+    bot.remove_webhook()
+    print("✅ Webhook حذف شد. ربات با Polling اجرا می‌شود.")
+    
     bot.infinity_polling()
