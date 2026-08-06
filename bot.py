@@ -119,12 +119,10 @@ def get_stats():
     total_users = cur.fetchone()[0]
     cur.execute("SELECT SUM(purchases) FROM users")
     total_purchases = cur.fetchone()[0] or 0
-    cur.execute("SELECT COUNT(*) FROM users WHERE purchases > 0 AND purchases % 5 = 0")
-    total_gifted = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM orders WHERE status='pending'")
     pending_count = cur.fetchone()[0]
     conn.close()
-    return total_users, total_purchases, total_gifted, pending_count
+    return total_users, total_purchases, pending_count
 
 def get_all_users():
     conn = sqlite3.connect("vpnbot.db")
@@ -149,10 +147,10 @@ plan_prices = {
 }
 
 plan_names = {
-    "plan_20": "📦 20 گیگ - 150 تومان - کاربر نامحدود -دوماهه ",
-    "plan_30": "📦 30 گیگ - 200 تومان - کاربر نامحدود -دوماهه ",
-    "plan_40": "📦 40 گیگ - 250 تومان - کاربر نامحدود -دوماهه ",
-    "plan_50": "📦 50 گیگ - 300 تومان - کاربر نامحدود -دوماهه "
+    "plan_20": "📦 20 گیگ - 150 تومان - کاربر نامحدود - دوماهه",
+    "plan_30": "📦 30 گیگ - 200 تومان - کاربر نامحدود - دوماهه",
+    "plan_40": "📦 40 گیگ - 250 تومان - کاربر نامحدود - دوماهه",
+    "plan_50": "📦 50 گیگ - 300 تومان - کاربر نامحدود - دوماهه"
 }
 
 # ================= KEYBOARDS =================
@@ -166,7 +164,6 @@ def main_keyboard(user_id=None):
 def admin_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add("📊 آمار", "👥 کاربران", "⏳ سفارشات", "📨 پیام", "📢 همگانی", "🔙 منو اصلی")
-    # دکمه خاموش/روشن
     status_text = "🔴 خاموش کردن ربات" if bot_active else "🟢 روشن کردن ربات"
     markup.add(status_text)
     return markup
@@ -187,10 +184,6 @@ def start_cmd(msg):
 """
     bot.send_message(msg.chat.id, welcome_text, reply_markup=main_keyboard(msg.from_user.id))
 
-# ================= چک کردن وضعیت ربات قبل از هر اقدام =================
-def is_bot_active():
-    return bot_active
-
 # ================= USER BUTTONS =================
 @bot.message_handler(func=lambda m: m.text == "🛒 خرید اشتراک")
 def buy_handler(msg):
@@ -210,15 +203,11 @@ def my_purchases_handler(msg):
     uid = msg.from_user.id
     purchases = get_purchases(uid)
     orders = get_user_orders(uid)
-    remaining = 5 - (purchases % 5)
-    if remaining == 5:
-        remaining = 0
     
     text = f"""
 📊 اطلاعات حساب شما
 
 🛒 تعداد کل خرید: {purchases}
-
 """
     if orders:
         text += "\n📋 سفارشات اخیر:\n"
@@ -253,10 +242,9 @@ def support_handler(msg):
 @bot.message_handler(func=lambda m: m.text == "⚙️ پنل ادمین" and m.from_user.id == ADMIN_ID)
 def admin_panel(msg):
     stats = get_stats()
-    text = f"📊 آمار فروش\n\n👥 کاربران ثبت شده: {stats[0]}\n🛒 مجموع خریدها: {stats[1]}\n🎁 کاربران هدیه گرفته: {stats[2]}\n⏳ سفارشات در انتظار: {stats[3]}"
+    text = f"📊 آمار فروش\n\n👥 کاربران ثبت شده: {stats[0]}\n🛒 مجموع خریدها: {stats[1]}\n⏳ سفارشات در انتظار: {stats[2]}"
     bot.send_message(ADMIN_ID, text, reply_markup=admin_keyboard())
 
-# ================= دکمه خاموش/روشن =================
 @bot.message_handler(func=lambda m: m.text in ["🔴 خاموش کردن ربات", "🟢 روشن کردن ربات"] and m.from_user.id == ADMIN_ID)
 def toggle_bot(msg):
     global bot_active
@@ -266,13 +254,12 @@ def toggle_bot(msg):
     else:
         bot_active = True
         bot.send_message(ADMIN_ID, "🟢 ربات روشن شد. همه چیز فعال است.")
-    # بروزرسانی کیبورد ادمین
-    admin_panel(msg)  # مجدداً پنل ادمین را با دکمه جدید نشان می‌دهد
+    admin_panel(msg)
 
 @bot.message_handler(func=lambda m: m.text == "📊 آمار" and m.from_user.id == ADMIN_ID)
 def admin_stats(msg):
     stats = get_stats()
-    bot.send_message(ADMIN_ID, f"👥 {stats[0]} کاربر\n🛒 {stats[1]} خرید\n🎁 {stats[2]} هدیه\n⏳ {stats[3]} سفارش")
+    bot.send_message(ADMIN_ID, f"👥 {stats[0]} کاربر\n🛒 {stats[1]} خرید\n⏳ {stats[2]} سفارش")
 
 @bot.message_handler(func=lambda m: m.text == "👥 کاربران" and m.from_user.id == ADMIN_ID)
 def admin_users(msg):
@@ -381,18 +368,13 @@ def approve_callback(call):
     update_order_status(order_id, "approved")
     purchases = update_purchases(user_id)
     
-    remaining = 5 - (purchases % 5)
-    if remaining == 5:
-        remaining = 0
-    gift_msg = f"\n\n🎁 تبریک! شما یک اشتراک هدیه دریافت کردید! 🎁\n(هر ۵ خرید یک هدیه)" if purchases % 5 == 0 else ""
-    
     waiting_for_sub_link = True
     temp_user_id = user_id
     temp_order_id = order_id
     
     bot.answer_callback_query(call.id, "✅ تایید شد")
-    bot.send_message(ADMIN_ID, f"✅ سفارش #{order_id} کاربر {user_id} تایید شد.\n📊 تعداد خرید کاربر: {purchases}\n🎁 تا هدیه بعدی: {remaining} خرید{gift_msg}\n\n📎 لینک ساب را ارسال کنید:")
-    bot.send_message(user_id, f"✅ سفارش شما تایید شد!{gift_msg}\n\n⏳ لینک اشتراک در حال ارسال است...")
+    bot.send_message(ADMIN_ID, f"✅ سفارش #{order_id} کاربر {user_id} تایید شد.\n📊 تعداد خرید کاربر: {purchases}\n\n📎 لینک ساب را ارسال کنید:")
+    bot.send_message(user_id, "✅ سفارش شما تایید شد!\n\n⏳ لینک اشتراک در حال ارسال است...")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reject_"))
 def reject_callback(call):
@@ -448,10 +430,6 @@ def send_sub_link(msg):
         return
     
     update_order_status(temp_order_id, "completed", sub_link)
-    purchases = get_purchases(temp_user_id)
-    remaining = 5 - (purchases % 5)
-    if remaining == 5:
-        remaining = 0
     
     text = f"""
 🎉 اشتراک شما فعال شد! 🎉
@@ -466,9 +444,6 @@ def send_sub_link(msg):
 {sub_link}
 ━━━━━━━━━━━━━━━━━━━━
 
-🎁 تا هدیه بعدی: {remaining} خرید دیگر
-
-━━━━━━━━━━━━━━━━━━━━
 📱 آموزش اتصال (اندروید):
 1️⃣ اپ V2RayNG یا Hiddify را نصب کنید.
 2️⃣ روی Import From Clipboard کلیک کنید.
@@ -544,7 +519,6 @@ def default(msg):
             bot.send_message(msg.chat.id, "لطفاً از دکمه‌های منو استفاده کنید 👇", 
                              reply_markup=main_keyboard(msg.from_user.id))
     else:
-        # اگر ادمین پیام متنی غیر از دکمه‌ها بفرستد، نادیده گرفته می‌شود
         pass
 
 # ================= RUN =================
@@ -552,8 +526,10 @@ if __name__ == "__main__":
     print("🚀 ربات در حال اجراست...")
     init_db()
     
-    # حذف Webhook برای جلوگیری از تداخل با Polling
-    bot.remove_webhook()
-    print("✅ Webhook حذف شد. ربات با Polling اجرا می‌شود.")
+    try:
+        bot.remove_webhook()
+        print("✅ Webhook حذف شد. ربات با Polling اجرا می‌شود.")
+    except Exception as e:
+        print(f"⚠️ خطا در حذف Webhook: {e}")
     
     bot.infinity_polling()
